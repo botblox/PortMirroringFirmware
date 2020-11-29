@@ -58,37 +58,6 @@ static void MX_USART2_UART_Init(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
-// We will write a function to change the mode of the GPIO pin
-void GPIO_SET_MODE_OUTPUT() {
-	// Set MIDO pin to it's default status with HAL_GPIO_DeInit
-	HAL_GPIO_DeInit(MIIM_MDIO_GPIO_Port, MIIM_MDIO_Pin);
-
-	GPIO_InitTypeDef GPIO_InitStruct = {0};
-
-	 /* GPIO Ports Clock Enable */
-	 __HAL_RCC_GPIOC_CLK_ENABLE();
-	 __HAL_RCC_GPIOA_CLK_ENABLE();
-
-	/*Configure GPIO pin Output Level */
-	HAL_GPIO_WritePin(LED_BLUE_GPIO_Port, LED_BLUE_Pin, GPIO_PIN_RESET);
-
-	/*Configure GPIO pin Output Level */
-	HAL_GPIO_WritePin(GPIOA, LED_RED_Pin|MIIM_MDC_Pin|LED_GREEN_Pin, GPIO_PIN_RESET);
-
-	// Remember to set the other pins to the same settings as before
-	GPIO_InitStruct.Pin = LED_BLUE_Pin;
-	GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-	GPIO_InitStruct.Pull = GPIO_NOPULL;
-	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-	HAL_GPIO_Init(LED_BLUE_GPIO_Port, &GPIO_InitStruct);
-	/*Configure GPIO pins : LED_RED_Pin MIIM_MDC_Pin LED_GREEN_Pin MIIM_MDIO_Pin */
-	GPIO_InitStruct.Pin = LED_RED_Pin|MIIM_MDC_Pin|LED_GREEN_Pin|MIIM_MDIO_Pin;
-	GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-	GPIO_InitStruct.Pull = GPIO_NOPULL;
-	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-	HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
-}
-
 void GPIO_SET_MDIO_MODE_INPUT() {
 	// Set MIDO pin to it's default status with HAL_GPIO_DeInit
 	HAL_GPIO_DeInit(MIIM_MDIO_GPIO_Port, MIIM_MDIO_Pin);
@@ -198,7 +167,7 @@ void _MIIM_DRIVER_START() {
 }
 
 void _MIIM_DRIVER_OP_CODE_READ() {
-	// data = 0b10
+	// Data = 0b10
 	HAL_GPIO_WritePin(GPIOA, MIIM_MDIO_Pin, GPIO_PIN_SET);
 	_MIIM_DRIVER_CLOCK_PULSE();
 	HAL_GPIO_WritePin(GPIOA, MIIM_MDIO_Pin, GPIO_PIN_RESET);
@@ -268,27 +237,10 @@ uint16_t _MIIM_DRIVER_READ_DATA() {
 	GPIO_SET_MDIO_MODE_INPUT();
 	uint16_t data = 0;
 	for (uint8_t bitnum = 0; bitnum <= 15; ++bitnum) {
-//		HAL_GPIO_WritePin(GPIOA, MIIM_MDC_Pin, GPIO_PIN_RESET);
-//		HAL_Delay(2);
-//		//_MIIM_DRIVER_CLOCK_PULSE();
-//		HAL_GPIO_WritePin(GPIOA, MIIM_MDC_Pin, GPIO_PIN_SET);
-//		HAL_Delay(1);
-
-		// CLOCK HIGH -> CLOCK LOW -> READ
-//		HAL_GPIO_WritePin(GPIOA, MIIM_MDC_Pin, GPIO_PIN_SET);
-//		HAL_Delay(2);
-//		HAL_GPIO_WritePin(GPIOA, MIIM_MDC_Pin, GPIO_PIN_RESET);
-//		HAL_Delay(1);
-		//if (HAL_GPIO_ReadPin(GPIOA, MIIM_MDIO_Pin) == GPIO_PIN_SET) {
 		data = data + (HAL_GPIO_ReadPin(GPIOA, MIIM_MDIO_Pin) << (15-bitnum));
-		//}
-//		HAL_Delay(1);
-		//HAL_GPIO_WritePin(GPIOA, MIIM_MDC_Pin, GPIO_PIN_RESET);
-		//HAL_GPIO_WritePin(GPIOA, MIIM_MDC_Pin, GPIO_PIN_SET);
-		//HAL_Delay(1);
 		_MIIM_DRIVER_CLOCK_PULSE();
-
 	}
+
 	MX_GPIO_Init();
 	// Reset clock and data
 	HAL_GPIO_WritePin(GPIOA, MIIM_MDIO_Pin, GPIO_PIN_SET);
@@ -303,7 +255,6 @@ void MIIM_DRIVER_WRITE(uint8_t PHY, uint8_t REG, uint16_t DATA) {
 	/*
     Outputs the PHY and REG addresses to the ethernet chip. Writes 2 byte data packet
     to the ethernet chip for that PHY/REG address.
-
     Parameters:
         PHY (uint8_t):The data to be sent via the MIIM_MDIO pin
         			  values range from 0b00000000-0b00011111
@@ -335,7 +286,6 @@ void MIIM_DRIVER_WRITE(uint8_t PHY, uint8_t REG, uint16_t DATA) {
 uint16_t MIIM_DRIVER_READ(uint8_t PHY, uint8_t REG) {
 	/*
 	Reads 2 byte data packet from PHY and REG on ethernet chip.
-
 	Parameters:
 	    PHY (uint8_t):The data to be sent via the MIIM_MDIO pin
 	        			  values range from 0b00000000-0b00011111
@@ -399,9 +349,11 @@ int main(void)
   MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
 
-  // Try to configure the port mirroring settings once
-  // We may need to write to the chip multiple times
-  // If that is the case, we may need to change our starting conditions so that they only work first time.
+  // Port mirroring settings
+  // Please only configure headings marked with '***'
+  // I strongly encourage that you have the data sheet for the IP175Gx to hand
+  // If you spot a mistake or potential improvement (we already have lots of improvements in mind) - please let us know
+  // We have currently configured the default settings to mirror RX traffic on port 3 (labelled port 4 on SwitchBlox) to port 2 (labelled port 3 on SwitchBlox)
 
   // (0) Declare and define PHY and REG variables,
   uint8_t PHY = 20;
@@ -409,81 +361,87 @@ int main(void)
   uint8_t REG4 = 4;
 
 
-  // (1) Enable port mirroring by writing to 20.3[15] - PHY=20, REG = 3, bitnum = 15
+  //***(1) Enable port mirroring by writing to 20.3[15] - PHY=20, REG = 3, bitnum = 15
   uint8_t PORT_MIRROR_EN = 0b1;
 
-  // (2) Select port 3 as the mirror or 'sniffing' port
-  // Not necessary as Port 4 is configured as the default sniffer port anyway
+  //***(2) Select the port that will be the mirror or 'sniffing' port
+  // The SwitchBlox currently has labelled Port X+1 (i.e. Port 0 -> Labelled Port 1 on SwitchBlox)
+  // ^This may change on future revisions
+  // Only select one port to be the mirror port
+  // In order of 'SEL_MIRROR_PORT' declarations: (default: port 4)
+  //(1) Port 0
+  //(2) Port 1
+  //(3) Port 2
+  //(4) Port 3
+  //(5) Port 4 (default)
+
+  //uint8_t SEL_MIRROR_PORT = 0b010;
+  //uint8_t SEL_MIRROR_PORT = 0b011;
+  uint8_t SEL_MIRROR_PORT = 0b100;
+  //uint8_t SEL_MIRROR_PORT = 0b110;
   //uint8_t SEL_MIRROR_PORT = 0b111;
 
-  // (3) Select the port mirroring mode - in this case we only want to mirror RX traffic
-  // Not necessary as this is also enabled by default
-  // Now we want to mirror RX and TX traffic
-  uint8_t PORT_MIRROR_MODE = 0b00;
+  //***(3) Select the port mirroring mode
+  // Set the conditions that traffic on the mirrored ports must fulfill for it to be mirrored to the sniffer port
+  // In order of 'PORT_MIRROR_MODE' declarations: (default: mirror RX)
+  //(1) mirror RX (default)
+  //(2) mirror TX
+  //(3) mirror RX and TX
+  //(4) mirror RX or TX
 
-  // (4) Select the RX source port that will have it's RX data flow mirrored to the sniffer port
-  // Select port 2 (port 2 of the chip) to be the RX
+  uint8_t PORT_MIRROR_MODE = 0b00;
+  //uint8_t PORT_MIRROR_MODE = 0b01;
+  //uint8_t PORT_MIRROR_MODE = 0b10;
+  //uint8_t PORT_MIRROR_MODE = 0b11;
+
+  //***(4a) Select the RX source port that will have its RX data flow mirrored to the sniffer port
+  // In order of 'SEL_RX_PORT_MIRROR' declarations: (default: None)
+  //(1) port 0
+  //(2) port 1
+  //(3) port 2
+  //(4) port 3
+  //(5) port 4
+
+  //uint8_t SEL_RX_PORT_MIRROR = 0b00000100;
+  //uint8_t SEL_RX_PORT_MIRROR = 0b00001000;
+  //uint8_t SEL_RX_PORT_MIRROR = 0b00010000;
   uint8_t SEL_RX_PORT_MIRROR = 0b01000000;
-  //uint8_t SEL_TX_PORT_MIRROR = 0x30;
+  //uint8_t SEL_RX_PORT_MIRROR = 0b10000000;
+
+  //***(4b) Select the TX source port that will have its TX data flow mirrored to the sniffer port
+  // Must configure 'PORT_MIRROR_MODE' to include mirroring TX
+  // In order of 'SEL_TX_PORT_MIRROR' declarations: (default: None)
+  //(1) port 0
+  //(2) port 1
+  //(3) port 2
+  //(4) port 3
+  //(5) port 4
+
+  //uint8_t SEL_TX_PORT_MIRROR = 0b00000100;
+  //uint8_t SEL_TX_PORT_MIRROR = 0b00001000;
+  //uint8_t SEL_TX_PORT_MIRROR = 0b00010000;
+  //uint8_t SEL_TX_PORT_MIRROR = 0b01000000;
+  uint8_t SEL_TX_PORT_MIRROR = 0b10000000;
 
   // (5) Create the data packet to send to 20.3/20.4 PHY.REG
-  // With the very basic setup where we only configure PORT_MIRROR_EN and SEL_RX_PORT_MIRROR
-  // We actually don't need to send any data to REG4
-  // Also, the default for REG3 is all 0's for the bits that we aren't writing to
-  // Hence we can (in theory) construct our data packet from just PORT_MIRROR_EN and SEL_RX_PORT_MIRROR
-  // without any consideration for what was already written to REG3.
-  // Bare in mind that we are writing to the reserved bits 20.3[12:8] - I am unsure hwo the IP175G actually manages that
-  // My guess is that these reserved bits never actually get written to even when you do the write command.
   uint16_t PORT_MIRROR_CONFIG_REG3 = (((uint16_t) PORT_MIRROR_EN) << 15) | (((uint16_t) PORT_MIRROR_MODE) << 13) | (SEL_RX_PORT_MIRROR);
-  //uint16_t PORT_MIRROR_CONFIG_REG3 = (((uint16_t) PORT_MIRROR_EN) << 15) | (((uint16_t) PORT_MIRROR_MODE) << 13);
-  //uint16_t PORT_MIRROR_CONFIG_REG4 = ((uint16_t) SEL_MIRROR_PORT << 13 | SEL_TX_PORT_MIRROR);
-  //uint16_t PORT_MIRROR_CONFIG_REG4 = ((uint16_t) SEL_MIRROR_PORT << 13 |
+  uint16_t PORT_MIRROR_CONFIG_REG4 = (((uint16_t) SEL_MIRROR_PORT << 13) | (SEL_TX_PORT_MIRROR));
 
   // (6) Execute the command to write the configurations for port mirroring
+  // For some reason, writing only once doesn't work all the time (if you find a solution, please publish an issue to https://github.com/AaronElijah/IP175GPortMirroringConfig
   for (uint8_t j = 0; j <= 10; j++) {
- 	 HAL_Delay(5);
- 	 MIIM_DRIVER_WRITE(PHY, REG3, PORT_MIRROR_CONFIG_REG3);
- 	 //MIIM_DRIVER_WRITE(PHY, REG4, PORT_MIRROR_CONFIG_REG4);
- }
-
-
-  // Optional to check the VLAN associated with each port to ensure that they are all on the same VLAN
-//  uint8_t PHY23 = 23;
-//  uint8_t REG16 = 16;
-//  uint8_t REG17 = 17;
-//  uint8_t REG18 = 18;
-//
-//  for (uint8_t i = 0; i <= 5; i++) {
-//	  uint16_t PBV_MEMBER_P01 = MIIM_DRIVER_READ(PHY23, REG16);
-//	  HAL_Delay(5);
-//  }
-//  for (uint8_t k = 0; k <= 5; k++) {
-//	  uint16_t PBV_MEMBER_P2 = MIIM_DRIVER_READ(PHY23, REG17);
-//	  HAL_Delay(5);
-//  }
-//  for (uint8_t l = 0; l <= 5; l++) {
-//	  uint16_t PBV_MEMBER_P34 = MIIM_DRIVER_READ(PHY23, REG18);
-//	  HAL_Delay(5);
-//  }
+   HAL_Delay(5);
+   MIIM_DRIVER_WRITE(PHY, REG3, PORT_MIRROR_CONFIG_REG3);
+   HAL_Delay(5);
+   MIIM_DRIVER_WRITE(PHY, REG4, PORT_MIRROR_CONFIG_REG4);
+  }
 
   GPIO_SET_MDIO_MDC_MODE_INPUT();
 
-
-
-  // TEMPORARY TEST SETTING THE SPEED TO 10/100
-//  PHY = 2;
-//  uint8_t REG0 = 0;
-////  uint8_t SPEED_SELECT = 0b0;
-////  uint8_t AUTO_NEG_EN = 0b0;
-//  //uint16_t SPEED_SET_CONFIG_REG0 = 0b0011000000000000;
-//  uint16_t SPEED_SET_CONFIG_REG0 = 0;
-//
-//  for (uint8_t j = 0; j <= 10; j++) { // FOR FUCK SAKE! DO NOT GO LESS THAN 10 ITERATIONS - HAVE NO CLUE WHY
-//	  HAL_Delay(5);
-//	  MIIM_DRIVER_WRITE(PHY, REG0, SPEED_SET_CONFIG_REG0);
-//  }
-
-  //GPIO_SET_MDIO_MDC_MODE_INPUT();
+  // Set the colour of the LED purple
+  HAL_GPIO_WritePin(GPIOA, LED_GREEN_Pin, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(GPIOA, LED_RED_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(LED_BLUE_GPIO_Port, LED_BLUE_Pin, GPIO_PIN_RESET);
 
   /* USER CODE END 2 */
 
@@ -494,38 +452,6 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-	  //HAL_Delay(20);
-	  //MIIM_DRIVER_WRITE(PHY, REG0, SPEED_SET_CONFIG_REG0);
-
-
-	  //_MIIM_DRIVER_CLOCK_PULSE();
-
-	  // We should read the registers first, so that we get an idea of what the registers are before we write to them
-//	  for (uint8_t i = 0; i <= 5; i++) {
-//		  HAL_Delay(100);
-//		  uint16_t pre_reg_data = MIIM_DRIVER_READ(PHY, REG3);
-//		  HAL_Delay(100);
-//	  }
-//
-//	  for (uint8_t j = 0; j <= 5; j++) {
-//		  HAL_Delay(100);
-//	  	  // (6) Execute the command to write the configurations for port mirroring
-//	  	  MIIM_DRIVER_WRITE(PHY, REG3, PORT_MIRROR_CONFIG_REG3);
-//	  }
-
-	  // We should read the registers first, so that we get an idea of what the registers are before we write to them
-//	  for (uint8_t k = 0; k <= 5; k++) {
-//		HAL_Delay(100);
-//	  	uint16_t post_reg3_data = MIIM_DRIVER_READ(PHY, REG3);
-//	  	uint16_t post_reg4_data = MIIM_DRIVER_READ(PHY, REG4);
-//	  	HAL_Delay(100);
-//	  }
-
-	  //MIIM_DRIVER_WRITE(PHY, REG3, PORT_MIRROR_CONFIG_REG3);
-	  //HAL_Delay(50);
-	  //uint16_t post_reg3_data = MIIM_DRIVER_READ(PHY, REG3);
-	  //uint16_t post_reg4_data = MIIM_DRIVER_READ(PHY, REG4);
-
 
   }
   /* USER CODE END 3 */
